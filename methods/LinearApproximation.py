@@ -1,11 +1,9 @@
 import numpy as np
 
 from methods.auxiliaryMethods.Kramer import findCoeffs
-from utils.Utils import predefined_functions
 
 
-def linearApproximation(eq_num, matrix, n):
-    f = predefined_functions[eq_num].function
+def linearApproximation(matrix, n):
     sx = round(sum(matrix[1]), 6)
     sy = round(sum(matrix[2]), 6)
     sxx=0

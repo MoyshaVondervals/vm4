@@ -4,7 +4,8 @@ from utils.Utils import addLinear, addQuadratic, addCubic, addLogarithmic, addPo
 
 
 def addDotsToMatrix(matrix, linear, quadratic, cubic):
-    limitation = False
+    validX = False
+    validY = False
 
     lin = []
     linS = []
@@ -21,7 +22,8 @@ def addDotsToMatrix(matrix, linear, quadratic, cubic):
     powS = []
 
     sumS = []
-    count = 0
+    countX = 0
+    countY = 0
     for i in range(len(matrix[1])):
         lin.append(addLinear(linear, matrix[1][i]))
         linS.append((addLinear(linear, matrix[1][i])-matrix[2][i])**2)
@@ -30,13 +32,9 @@ def addDotsToMatrix(matrix, linear, quadratic, cubic):
         cub.append(addCubic(cubic, matrix[1][i]))
         cubS.append((addCubic(cubic, matrix[1][i]) - matrix[2][i]) ** 2)
         if matrix[1][i]>0:
-            count += 1
-            exp.append(addExponential(linear, matrix[1][i]))
-            expS.append((addExponential(linear, matrix[1][i]) - matrix[2][i]) ** 2)
-            log.append(addLogarithmic(linear, matrix[1][i]))
-            logS.append((addLogarithmic(linear, matrix[1][i]) - matrix[2][i]) ** 2)
-            pow.append(addPower(linear, matrix[1][i]))
-            powS.append((addPower(linear, matrix[1][i]) - matrix[2][i]) ** 2)
+            countX += 1
+        if matrix[2][i]>0:
+            countY += 1
 
 
 
@@ -49,19 +47,40 @@ def addDotsToMatrix(matrix, linear, quadratic, cubic):
     matrix.append(cub)
     matrix.append(cubS)
     sumS.append(round(sum(cubS), 6))
-    if count==len(matrix[1]):
-        matrix.append(exp)
-        matrix.append(expS)
-        sumS.append(round(sum(expS), 6))
-        matrix.append(log)
-        matrix.append(logS)
-        sumS.append(round(sum(logS), 6))
+
+    if countX == countY == len(matrix[0]):
+        for i in range(len(matrix[0])):
+            pow.append(addPower(matrix, matrix[1][i]))
+            powS.append((addPower(matrix, matrix[1][i]) - matrix[2][i]) ** 2)
         matrix.append(pow)
         matrix.append(powS)
         sumS.append(round(sum(powS), 6))
-    else:
-        limitation = True
+        validX = True
+        validY = True
 
-    return sumS, matrix, limitation
+
+
+
+    if countX==len(matrix[0]):
+        for i in range(len(matrix[0])):
+            log.append(addLogarithmic(matrix, matrix[1][i]))
+            logS.append((addLogarithmic(matrix, matrix[1][i]) - matrix[2][i]) ** 2)
+        matrix.append(log)
+        matrix.append(logS)
+        sumS.append(round(sum(logS), 6))
+        validX = True
+
+
+    if countY==len(matrix[0]):
+        for i in range(len(matrix[0])):
+            exp.append(addExponential(matrix, matrix[1][i]))
+            expS.append((addExponential(matrix, matrix[1][i]) - matrix[2][i]) ** 2)
+        matrix.append(exp)
+        matrix.append(expS)
+        sumS.append(round(sum(expS), 6))
+        validY = True
+
+
+    return sumS, matrix, validX, validY
 
 

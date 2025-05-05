@@ -4,6 +4,11 @@ from collections.abc import Callable
 
 import numpy as np
 
+from methods.ExponentialApproximation import exponentialApproximation
+from methods.LinearApproximation import linearApproximation
+from methods.LogarithmicApproximation import logarithmicApproximations
+from methods.PowerApproximation import powerApproximations
+
 
 class Equation:
     def __init__(self, function: Callable, text: str):
@@ -13,18 +18,9 @@ class Equation:
 
 
 
-predefined_functions = {
-    1: Equation(lambda x: ((18*x)/(x**4+10)), r"18x/(x^4+10)"), #2x-1
-    2: Equation(lambda x: (0.4*x**2-3*x+5), r"0.4x^2 - 3x + 5"),
-    3: Equation(lambda x: (-0.2*x**3+1.5*x**2-4*x+2), r"-0.2x^3 + 1.5x^2 - 4x + 2"),
-    4: Equation(lambda x: (math.e**(0.7*x)), r"3e^{0.7x}"),
-    5:Equation(lambda x: (2*math.log(x)-1), r"2*ln(x) - 1"),
-    6:Equation(lambda x: (5*x**(0.8)), r"5x^{0.8}"),
-}
 
-
-
-
+def toArray(x):
+    return np.asarray(x, dtype=float)
 
 
 
@@ -36,16 +32,21 @@ def addQuadratic(coeffs, x):
 def addCubic(coeffs, x):
     return coeffs[0]+coeffs[1]*x+coeffs[2]*x**2+coeffs[3]*x**3
 
-def addExponential(coeffs, x):
+def addExponential(matrix, x):
+    coeffs = exponentialApproximation(matrix)
     return coeffs[0]*math.exp(coeffs[1]*x)
 
-def addLogarithmic(coeffs, x):
-    return coeffs[0]+coeffs[1]* math.log(x)
+def addLogarithmic(matrix, x):
+    coeffs = logarithmicApproximations(matrix)
+    # return coeffs[0]*math.log(x)+coeffs[1]
+    return coeffs[0]+coeffs[1]*math.log(x)
 
-def addPower(coeffs, x):
-    return coeffs[0]*(x**coeffs[1])
+def addPower(matrix, x):
+    coeffs = powerApproximations(matrix)
+    return coeffs[0] * (x ** coeffs[1])
 
-def printGraph(ax, canvas, a, b, linear, quadratic, cubic, matrix, limitation):
+
+def printGraph(ax, canvas, linear, quadratic, cubic, matrix, validX, validY):
 
     ax.clear()
 
@@ -67,22 +68,24 @@ def printGraph(ax, canvas, a, b, linear, quadratic, cubic, matrix, limitation):
     y_quadratic = [addQuadratic(quadratic, x) for x in x_vals]
     y_cubic     = [addCubic(cubic,     x) for x in x_vals]
     x_vals_pos = x_vals[x_vals > 0]
-    if not limitation:
-
-        y_exp = [addExponential(linear, x) for x in x_vals_pos]
-        y_log = [addLogarithmic(linear, x) for x in x_vals_pos]
-        y_pow = [addPower(linear, x) for x in x_vals_pos]
+    if validX and validY:
+        y_pow = [addPower(matrix, x) for x in x_vals_pos]
+    if validX:
+        y_log = [addLogarithmic(matrix, x) for x in x_vals_pos]
+    if validY:
+        y_exp = [addExponential(matrix, x) for x in x_vals_pos]
 
 
 
     ax.plot(x_vals, y_linear,    color='blue',   label='Линейная')
     ax.plot(x_vals, y_quadratic, color='orange', label='Квадратичная')
     ax.plot(x_vals, y_cubic,     color='green',  label='Кубическая')
-    if not limitation:
-        ax.plot(x_vals_pos, y_exp, color='red', label='Экспоненциальная')
-        ax.plot(x_vals_pos, y_log, color='purple', label='Логарифмическая')
+    if validX and validY:
         ax.plot(x_vals_pos, y_pow, color='brown', label='Степенная')
-
+    if validX:
+        ax.plot(x_vals_pos, y_log, color='purple', label='Логарифмическая')
+    if validY:
+        ax.plot(x_vals_pos, y_exp, color='red', label='Экспоненциальная')
     all_y   = y_data + y_linear + y_quadratic + y_cubic
     y_min   = min(all_y)
     y_max   = max(all_y)
@@ -116,68 +119,6 @@ def clear_graph(ax, canvas):
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     canvas.draw()
-
-
-def checkBrakePoints(eq_num, left_bound, right_bound):
-    f = predefined_functions[eq_num].function
-
-    try:
-        val = f(left_bound)
-        if isinstance(val, complex):
-            return []
-    except (ZeroDivisionError, OverflowError, ValueError):
-        return []
-
-    try:
-        val = f(right_bound)
-        if isinstance(val, complex):
-            return []
-    except (ZeroDivisionError, OverflowError, ValueError):
-        return []
-
-    width = right_bound - left_bound
-    n = math.ceil(width * 1000)
-    if n < 1:
-        n = 1
-
-    h = width / n
-
-    valid_intervals = []
-    in_valid_segment = False
-    current_start = None
-
-    def can_evaluate(x):
-        try:
-            val = f(x)
-            if isinstance(val, complex):
-                return False
-            return True
-        except (ZeroDivisionError, OverflowError, ValueError):
-            return False
-
-    for i in range(n + 1):
-        point = left_bound + i * h
-        if i == n:
-            point = right_bound
-
-        if can_evaluate(point):
-            if not in_valid_segment:
-                in_valid_segment = True
-                current_start = point
-        else:
-            if in_valid_segment:
-                in_valid_segment = False
-
-                valid_intervals.append((round(current_start, 6), round(point - h, 6)))
-
-    if in_valid_segment:
-        valid_intervals.append((round(current_start, 6), round(right_bound, 6)))
-
-
-
-    return valid_intervals
-
-
 
 
 

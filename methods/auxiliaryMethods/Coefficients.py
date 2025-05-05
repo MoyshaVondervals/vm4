@@ -26,22 +26,13 @@ def getPirsonCode(r):
         return 33
     elif 0.7<abs(r)<=0.9:
         return 34
-    elif 0.9<abs(r)<1:
+    elif 0.9<abs(r)<=1:
         return 35
 
 def getRowIndex(n):
-    if n==1:
-        return 3
-    elif n==2:
-        return 5
-    elif n==3:
-        return 7
-    elif n==4:
-        return 9
-    elif n==5:
-        return 11
-    elif n==6:
-        return 13
+
+    return (n*2) +1
+
 
 def standardDeviation(S, n):
     sigma = round(math.sqrt(S/n), 6)

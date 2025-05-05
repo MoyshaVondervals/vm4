@@ -1,38 +1,50 @@
 import os
+import sys
 
 from PyQt6.QtWidgets import QTableWidgetItem
 
 from methods.CubicApproximation import cubicApproximation
+from methods.ExponentialApproximation import exponentialApproximation
 from methods.LinearApproximation import linearApproximation
+from methods.LogarithmicApproximation import logarithmicApproximations
+from methods.PowerApproximation import powerApproximations
 from methods.QuadraticApproximation import quadraticApproximation
 from methods.auxiliaryMethods.Coefficients import pirson, standardDeviation, determination
-from methods.auxiliaryMethods.MatrixIXY import matrixIXY
 from methods.auxiliaryMethods.AddDotsToMatrix import addDotsToMatrix
 from utils import messages
 from utils.Utils import clear_graph, printGraph
 
 
-def handler(main_window, eq_num, output_file, left_bound, right_bound, h):
+def handler(main_window, output_file, x_array, y_array):
     table = main_window.table_step
     result = main_window.resultTable
-
+    matrix = []
+    sigmas = [0, sys.maxsize]
     clear_graph(main_window.ax, main_window.canvas)
     table.setRowCount(0)
     result.setRowCount(0)
+    n = len(x_array)
+    g = []
+    for i in range(n):
+        g.append(i+1)
+    matrix.append(g)
+    matrix.append(x_array)
+    matrix.append(y_array)
 
-    n, matrix = matrixIXY(eq_num, left_bound, right_bound, h)
     if matrix == []:
         main_window.lbl_bottom.setText(messages.getMessageByCode(21))
     else:
 
 
 
-        linearCoeffs = linearApproximation(eq_num, matrix, n)
-        quadraticCoeffs = quadraticApproximation(eq_num, matrix, n)
-        cubicCoeffs = cubicApproximation(eq_num, matrix, n)
-        sumS, matrix, limitation = addDotsToMatrix(matrix, linearCoeffs, quadraticCoeffs, cubicCoeffs)
+        linearCoeffs = linearApproximation( matrix, n)
+        quadraticCoeffs = quadraticApproximation( matrix, n)
+        cubicCoeffs = cubicApproximation( matrix, n)
+        sumS, matrix, validX, validY = addDotsToMatrix(matrix, linearCoeffs, quadraticCoeffs, cubicCoeffs)
+        print(sumS)
+        print(validX, validY)
         pirsonCode, r = pirson(matrix)
-
+        vitoScaletta = checkS(validX, validY)
         headers = [
             "Тип аппроксимации",
             "Коэффициенты",
@@ -52,7 +64,10 @@ def handler(main_window, eq_num, output_file, left_bound, right_bound, h):
         result.setItem(row, 0, QTableWidgetItem("Линейная"))
         result.setItem(row, 1, QTableWidgetItem(str(linearCoeffs)))
         result.setItem(row, 2, QTableWidgetItem(f"{linearCoeffs[0]} + {linearCoeffs[1]}x"))
-        result.setItem(row, 3, QTableWidgetItem(str(standardDeviation(sumS[0], len(matrix[0])))))
+        sigma = (standardDeviation(sumS[0], len(matrix[0])))
+        if sigmas[1] > sigma:
+            sigmas[1] = sigma
+        result.setItem(row, 3, QTableWidgetItem(str(sigma)))
         result.setItem(row, 4, QTableWidgetItem(f"{r} {messages.getMessageByCode(pirsonCode)}"))
         result.setItem(row, 5, QTableWidgetItem(f"{r2}"))
         result.setItem(row, 6, QTableWidgetItem(messages.getMessageByCode(detCode)))
@@ -64,8 +79,12 @@ def handler(main_window, eq_num, output_file, left_bound, right_bound, h):
         result.setItem(row, 1, QTableWidgetItem(str(quadraticCoeffs)))
         result.setItem(row, 2, QTableWidgetItem(
             f"{quadraticCoeffs[0]} + {quadraticCoeffs[1]}x + {quadraticCoeffs[2]}x²"))
-        result.setItem(row, 3, QTableWidgetItem(str(standardDeviation(sumS[1], len(matrix[0])))))
-        result.setItem(row, 4, QTableWidgetItem(""))  # r для квадрата не считался
+        sigma = (standardDeviation(sumS[1], len(matrix[0])))
+        if sigmas[1] > sigma:
+            sigmas[0] = 1
+            sigmas[1] = sigma
+        result.setItem(row, 3, QTableWidgetItem(str(sigma)))
+        result.setItem(row, 4, QTableWidgetItem(""))
         result.setItem(row, 5, QTableWidgetItem(f"{r2}"))
         result.setItem(row, 6, QTableWidgetItem(messages.getMessageByCode(detCode)))
         row += 1
@@ -76,44 +95,68 @@ def handler(main_window, eq_num, output_file, left_bound, right_bound, h):
         result.setItem(row, 1, QTableWidgetItem(str(cubicCoeffs)))
         result.setItem(row, 2, QTableWidgetItem(
             f"{cubicCoeffs[0]} + {cubicCoeffs[1]}x + {cubicCoeffs[2]}x² + {cubicCoeffs[3]}x³"))
-        result.setItem(row, 3, QTableWidgetItem(str(standardDeviation(sumS[2], len(matrix[0])))))
+        sigma = (standardDeviation(sumS[2], len(matrix[0])))
+        if sigmas[1] > sigma:
+            sigmas[0] = 2
+            sigmas[1] = sigma
+        result.setItem(row, 3, QTableWidgetItem(str(sigma)))
         result.setItem(row, 4, QTableWidgetItem(""))
         result.setItem(row, 5, QTableWidgetItem(f"{r2}"))
         result.setItem(row, 6, QTableWidgetItem(messages.getMessageByCode(detCode)))
         row += 1
 
-        if not limitation:
-            detCode, r2 = determination(matrix, 4)
+
+        if validX and validY:
+
+            powerCoeffs = powerApproximations(matrix)
+
+
+            detCode, r2 = determination(matrix, vitoScaletta[0]+1)
             result.insertRow(row)
-            result.setItem(row, 0, QTableWidgetItem("Экспоненциальная"))
-            result.setItem(row, 1, QTableWidgetItem(str(linearCoeffs)))
+            result.setItem(row, 0, QTableWidgetItem("Степенная"))
+            result.setItem(row, 1, QTableWidgetItem(str(powerCoeffs)))
             result.setItem(row, 2, QTableWidgetItem(
-                f"{linearCoeffs[0]}·e^{linearCoeffs[1]}x"))
-            result.setItem(row, 3, QTableWidgetItem(str(standardDeviation(sumS[3], len(matrix[0])))))
+                f"{powerCoeffs[0]}·x^{powerCoeffs[1]}"))
+            sigma = (standardDeviation(sumS[vitoScaletta[0]], len(matrix[0])))
+            if sigmas[1] > sigma:
+                sigmas[0] = 3
+                sigmas[1] = sigma
+            result.setItem(row, 3, QTableWidgetItem(str(sigma)))
+            result.setItem(row, 4, QTableWidgetItem(""))
+            result.setItem(row, 5, QTableWidgetItem(f"{r2}"))
+            result.setItem(row, 6, QTableWidgetItem(messages.getMessageByCode(detCode)))
+            row += 1
+        if validX:
+            logCoeffs = logarithmicApproximations(matrix)
+            detCode, r2 = determination(matrix, vitoScaletta[1]+1)
+            result.insertRow(row)
+            result.setItem(row, 0, QTableWidgetItem("Логарифмическая"))
+            result.setItem(row, 1, QTableWidgetItem(str(logCoeffs)))
+            result.setItem(row, 2, QTableWidgetItem(
+                f"{logCoeffs[0]}ln(x)+{logCoeffs[1]}"))
+            sigma = (standardDeviation(sumS[vitoScaletta[1]], len(matrix[0])))
+            if sigmas[1] > sigma:
+                sigmas[0] = 4
+                sigmas[1] = sigma
+            result.setItem(row, 3, QTableWidgetItem(str(sigma)))
             result.setItem(row, 4, QTableWidgetItem(""))
             result.setItem(row, 5, QTableWidgetItem(f"{r2}"))
             result.setItem(row, 6, QTableWidgetItem(messages.getMessageByCode(detCode)))
             row += 1
 
-            detCode, r2 = determination(matrix, 5)
+        if validY:
+            expCoeffs = exponentialApproximation(matrix)
+            detCode, r2 = determination(matrix, vitoScaletta[2]+1)
             result.insertRow(row)
-            result.setItem(row, 0, QTableWidgetItem("Логарифмическая"))
-            result.setItem(row, 1, QTableWidgetItem(str(linearCoeffs)))
+            result.setItem(row, 0, QTableWidgetItem("Экспоненциальная"))
+            result.setItem(row, 1, QTableWidgetItem(str(expCoeffs)))
             result.setItem(row, 2, QTableWidgetItem(
-                f"{linearCoeffs[0]} + {linearCoeffs[1]}·ln(x)"))
-            result.setItem(row, 3, QTableWidgetItem(str(standardDeviation(sumS[4], len(matrix[0])))))
-            result.setItem(row, 4, QTableWidgetItem(""))
-            result.setItem(row, 5, QTableWidgetItem(f"{r2}"))
-            result.setItem(row, 6, QTableWidgetItem(messages.getMessageByCode(detCode)))
-            row += 1
-            # === СТЕПЕННАЯ ===
-            detCode, r2 = determination(matrix, 6)
-            result.insertRow(row)
-            result.setItem(row, 0, QTableWidgetItem("Степенная"))
-            result.setItem(row, 1, QTableWidgetItem(str(linearCoeffs)))
-            result.setItem(row, 2, QTableWidgetItem(
-                f"{linearCoeffs[0]}·x^{linearCoeffs[1]}"))
-            result.setItem(row, 3, QTableWidgetItem(str(standardDeviation(sumS[5], len(matrix[0])))))
+                f"{expCoeffs[0]}·e^({expCoeffs[1]}x)"))
+            sigma = (standardDeviation(sumS[vitoScaletta[2]], len(matrix[0])))
+            if sigmas[1] > sigma:
+                sigmas[0] = 5
+                sigmas[1] = sigma
+            result.setItem(row, 3, QTableWidgetItem(str(sigma)))
             result.setItem(row, 4, QTableWidgetItem(""))
             result.setItem(row, 5, QTableWidgetItem(f"{r2}"))
             result.setItem(row, 6, QTableWidgetItem(messages.getMessageByCode(detCode)))
@@ -139,17 +182,28 @@ def handler(main_window, eq_num, output_file, left_bound, right_bound, h):
             print(f"Результаты сохранены в файл: {output_file}")
         else:
             main_window.lbl_bottom.setText(messages.getMessageByCode(13))
-        determination(matrix, 1)
 
-
+        main_window.lbl_bottom.setText(f"Наиболее точная функция {getBestFunction(sigmas[0])}")
         fillTable(table, matrix)
 
 
-        printGraph(main_window.ax, main_window.canvas, left_bound, right_bound, linearCoeffs, quadraticCoeffs, cubicCoeffs, matrix, limitation)
+        printGraph(main_window.ax, main_window.canvas, linearCoeffs, quadraticCoeffs, cubicCoeffs, matrix, validX, validY)
 
 
 
-
+def getBestFunction(index):
+    if index == 0:
+        return "линейная"
+    elif index == 1:
+        return "квадратичная"
+    elif index == 2:
+        return "кубическая"
+    elif index == 3:
+        return "степенная"
+    elif index == 4:
+        return "логарифмическая"
+    elif index == 5:
+        return "экспоненциальная"
 
 
 def fillTable(table, matrix):
@@ -192,7 +246,14 @@ def fillTable(table, matrix):
     table.resizeRowsToContents()
 
 
-
+def checkS(validX, validY):
+    res = []
+    if validX and validY:
+        return [3, 4, 5]
+    if validX and not validY:
+        return [0, 3, 0]
+    if validY and not validX:
+        return [0, 0, 3]
 
 
 

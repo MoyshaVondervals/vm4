@@ -1,106 +1,67 @@
-﻿import math
-import os
+﻿import os
 import re
-from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
-from math import ceil
 
-from PyQt6.QtWidgets import QTableWidgetItem
-
-from depricatedMethods import RectangleLeftMethod, RectangleRightMethod, RectangleMidMethod, TrapezoidMethod, SimpsonMethod
-from utils import messages, Utils
-from utils.Handler import handler
-from utils.Utils import clear_graph, predefined_functions, checkBrakePoints
+from utils import messages, Handler
 
 
-def parse_data(main_window, eq_num, input_file, output_file, left_bound, right_bound, h):
+def parse_data(main_window, input_file, output_file, x_array, y_array):
     stackTrace = ""
     valid = True
 
-    if input_file == "":
-        left_bound = left_bound.replace(",", ".")
-        right_bound = right_bound.replace(",", ".")
-        h = h.replace(",", ".")
-        if re.match("^[+-]?(?:\d+[.,]\d+|\d+)$", left_bound) is None:
-            stackTrace += f"{messages.getMessageByCode(14)}\n"
-            valid =False
-        else:
-            left_bound = float(left_bound)
-        if re.match("^[+-]?(?:\d+[.,]\d+|\d+)$", right_bound) is None:
-            stackTrace += f"{messages.getMessageByCode(15)}\n"
-            valid = False
-        else:
-            right_bound = float(right_bound)
+    # === Если задан input_file — читаем оттуда ===
+    if input_file.strip():
+        parsed_x = []
+        parsed_y = []
 
-        if re.match("^[+-]?(?:\d+[.,]\d+|\d+)$", h) is None:
-            print("1")
-            stackTrace += f"{messages.getMessageByCode(16)}\n"
-            valid = False
-        else:
-            h = float(h)
-            # lowBound = math.ceil((right_bound-left_bound)*10000/12)/10000
-            # highBound = math.floor((right_bound-left_bound)*10000/8)/10000
-            lowBound = ((right_bound-left_bound)/12)
-            highBound = ((right_bound-left_bound)/7)
-            if not(lowBound<=h<=highBound):
-                stackTrace += f"{messages.getMessageByCode(16)}\n"
-                stackTrace += (f"На выбраном интервале возможны значения:"
-                               f" [{lowBound},"
-                               f" {highBound}]\n")
-
-                valid = False
-
-
-    else:
-        parsedData = []
-        print(os.getcwd())
+        # === Проверка существования файла ===
         if os.path.exists(input_file):
-            with open(input_file, "r", encoding="utf-8") as file:
-                lines = file.readlines()
-            for line in lines:
-                line = line.replace("\n", "")
-                parsedData.append(line)
+            try:
+                with open(input_file, "r", encoding="utf-8") as file:
+                    lines = [line.strip() for line in file if line.strip()]
 
-
-            left_bound = parsedData[0].replace(",", ".")
-            right_bound = parsedData[1].replace(",", ".")
-            h = parsedData[2].replace(",", ".")
-            if re.match("^[+-]?(?:\d+[.,]\d+|\d+)$", left_bound) is None:
-                stackTrace += f"{messages.getMessageByCode(14)}\n"
-                valid = False
-            else:
-                left_bound = float(left_bound)
-            if re.match("^[+-]?(?:\d+[.,]\d+|\d+)$", right_bound) is None:
-                stackTrace += f"{messages.getMessageByCode(15)}\n"
-                valid = False
-            else:
-                right_bound = float(right_bound)
-            if re.match("^[+-]?(?:\d+[.,]\d+|\d+)$", h) is None:
-                print("1")
-                stackTrace += f"{messages.getMessageByCode(16)}\n"
-                valid = False
-            else:
-                h = float(h)
-                lowBound = ((right_bound - left_bound) / 12)
-                highBound = ((right_bound - left_bound) / 7)
-                if not (lowBound <= h <= highBound):
-                    stackTrace += f"{messages.getMessageByCode(16)}\n"
-                    stackTrace += (f"На выбраном интервале возможны значения:"
-                                   f" [{lowBound},"
-                                   f" {highBound}]\n")
+                if not (8 <= len(lines) <= 12):
+                    stackTrace += "Ошибка: количество строк в файле должно быть от 8 до 12.\n"
                     valid = False
+                else:
+                    for i, line in enumerate(lines, start=1):
+                        parts = re.split(r"\s+", line)
+                        if len(parts) != 2:
+                            stackTrace += f"Ошибка: строка {i} должна содержать два числа (x y).\n"
+                            valid = False
+                            break
+                        try:
+                            x_val = float(parts[0].replace(",", "."))
+                            y_val = float(parts[1].replace(",", "."))
+                            parsed_x.append(x_val)
+                            parsed_y.append(y_val)
+                        except ValueError:
+                            stackTrace += f"Ошибка: строка {i} содержит недопустимые значения.\n"
+                            valid = False
+                            break
+
+                    # === Новая проверка: длина x и y должна совпадать ===
+                    if valid and len(parsed_x) != len(parsed_y):
+                        stackTrace += "пары не образуются\n"
+                        valid = False
+
+            except Exception as e:
+                stackTrace += f"Ошибка при чтении файла: {str(e)}\n"
+                valid = False
         else:
             stackTrace += f"{messages.getMessageByCode(12)}\n"
             valid = False
-    if valid!=False and left_bound>right_bound:
-        stackTrace += f"{messages.getMessageByCode(17)}\n"
-        valid=False
 
+        if valid:
+            x_array[:] = parsed_x
+            y_array[:] = parsed_y
 
+    # === Вывод сообщений в интерфейс ===
+    if not valid:
+        main_window.lbl_bottom.setText(stackTrace)
+        return
 
-    main_window.lbl_bottom.setText(stackTrace)
-    if valid:
-        handler(main_window, eq_num, output_file, left_bound, right_bound, h)
+    print("x =", x_array)
+    print("y =", y_array)
 
-
-
-
+    # Вызываем обработку
+    Handler.handler(main_window, output_file, x_array, y_array)

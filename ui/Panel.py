@@ -1,126 +1,138 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QRadioButton, QLineEdit,
-    QLabel, QPushButton, QButtonGroup
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+    QSlider, QPushButton, QScrollArea, QFrame
 )
-from PyQt6.QtGui import QPixmap
-from matplotlib import pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from io import BytesIO
-
-from utils import FieldParser
-from utils.Utils import predefined_functions
+from PyQt6.QtCore import Qt
+from utils import FieldParser, messages
 
 
 class renderPanel(QWidget):
     def __init__(self, main_window):
         super().__init__()
-        layout = QHBoxLayout(self)
-        self.setLayout(layout)
+        self.main_window = main_window
+        self.x_inputs = []
+        self.y_inputs = []
 
-        # === Левая колонка: Выбор функции ===
-        col_left = QVBoxLayout()
-        self.eq_group = QButtonGroup(self)
+        layout = QVBoxLayout(self)
 
-        self.rb_eq1 = QRadioButton()
-        self.rb_eq2 = QRadioButton()
-        self.rb_eq3 = QRadioButton()
-        self.rb_eq4 = QRadioButton()
-        self.rb_eq5 = QRadioButton()
-        self.rb_eq6 = QRadioButton()
-        self.rb_eq1.setChecked(True)
-
-        self.eq_group.addButton(self.rb_eq1)
-        self.eq_group.addButton(self.rb_eq2)
-        self.eq_group.addButton(self.rb_eq3)
-        self.eq_group.addButton(self.rb_eq4)
-        self.eq_group.addButton(self.rb_eq5)
-        self.eq_group.addButton(self.rb_eq6)
-
-        self.add_formula_row(col_left, self.rb_eq1, predefined_functions[1].text)
-        self.add_formula_row(col_left, self.rb_eq2, predefined_functions[2].text)
-        self.add_formula_row(col_left, self.rb_eq3, predefined_functions[3].text)
-        self.add_formula_row(col_left, self.rb_eq4, predefined_functions[4].text)
-        self.add_formula_row(col_left, self.rb_eq5, predefined_functions[5].text)
-        self.add_formula_row(col_left, self.rb_eq6, predefined_functions[6].text)
-
-        layout.addLayout(col_left, 3)
-
-
-
-        # === Правая колонка: Поля ввода ===
-        col_right = QVBoxLayout()
-
+        # === Поля ввода файлов ===
         self.edit_file_input = QLineEdit()
-        self.edit_left_bound = QLineEdit()
-        self.edit_right_bound = QLineEdit()
-        self.edit_h = QLineEdit()
         self.edit_file_output = QLineEdit()
 
-        col_right.addWidget(QLabel("Входной файл:"))
-        col_right.addWidget(self.edit_file_input)
-        col_right.addWidget(QLabel("Левая граница (a):"))
-        col_right.addWidget(self.edit_left_bound)
-        col_right.addWidget(QLabel("Правая граница (b):"))
-        col_right.addWidget(self.edit_right_bound)
-        col_right.addWidget(QLabel("Шаг (h):"))
-        col_right.addWidget(self.edit_h)
-        col_right.addWidget(QLabel("Выходной файл:"))
-        col_right.addWidget(self.edit_file_output)
+        layout.addWidget(QLabel("Входной файл:"))
+        layout.addWidget(self.edit_file_input)
+        layout.addWidget(QLabel("Выходной файл:"))
+        layout.addWidget(self.edit_file_output)
 
+        # === Ползунок ===
+        slider_layout = QHBoxLayout()
+        slider_label = QLabel("Количество точек:")
+        self.slider_value_label = QLabel("8")
+
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setMinimum(8)
+        self.slider.setMaximum(12)
+        self.slider.setValue(8)
+        self.slider.valueChanged.connect(self.update_input_fields)
+
+        slider_layout.addWidget(slider_label)
+        slider_layout.addWidget(self.slider)
+        slider_layout.addWidget(self.slider_value_label)
+        layout.addLayout(slider_layout)
+
+        # === Контейнер с полями ввода ===
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+
+        self.inputs_container = QWidget()
+        self.inputs_layout = QVBoxLayout(self.inputs_container)
+        self.scroll.setWidget(self.inputs_container)
+
+        layout.addWidget(self.scroll)
+
+        # === Кнопка ===
         self.btn_solve = QPushButton("Решить")
-        self.btn_solve.clicked.connect(lambda: self.solve(main_window))
-        col_right.addWidget(self.btn_solve)
+        self.btn_solve.clicked.connect(self.solve)
+        layout.addWidget(self.btn_solve)
 
-        layout.addLayout(col_right, 3)
+        # === Инициализация полей ввода ===
+        self.update_input_fields(8)
 
-    def add_formula_row(self, layout, radio_button, latex_expr):
-        row = QHBoxLayout()
-        row.addWidget(radio_button)
+    def update_input_fields(self, value):
+        self.slider_value_label.setText(str(value))
 
-        label = QLabel()
-        pix = self.render_latex(rf"${latex_expr}$")
-        label.setPixmap(pix)
-        row.addWidget(label)
+        old_x_values = [x.text() for x in self.x_inputs]
+        old_y_values = [y.text() for y in self.y_inputs]
 
-        layout.addLayout(row)
+        for i in reversed(range(self.inputs_layout.count())):
+            widget = self.inputs_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        self.x_inputs = []
+        self.y_inputs = []
 
-    def render_latex(self, latex_str):
-        fig, ax = plt.subplots(figsize=(1.75, 0.20), dpi=100)
-        ax.axis("off")
-        ax.text(0.5, 0.5, latex_str, ha='center', va='center', fontsize=10)
+        for i in range(value):
+            row = QHBoxLayout()
+            x_input = QLineEdit()
+            y_input = QLineEdit()
 
-        buffer = BytesIO()
-        fig.tight_layout(pad=0)
-        canvas = FigureCanvas(fig)
-        canvas.print_png(buffer)
-        plt.close(fig)
+            if i < len(old_x_values):
+                x_input.setText(old_x_values[i])
+            if i < len(old_y_values):
+                y_input.setText(old_y_values[i])
 
-        pixmap = QPixmap()
-        pixmap.loadFromData(buffer.getvalue(), 'PNG')
-        return pixmap
+            x_input.setPlaceholderText(f"x{i + 1}")
+            y_input.setPlaceholderText(f"y{i + 1}")
 
-    def solve(self, main_window):
+            row.addWidget(QLabel(f"{i + 1}."))
+            row.addWidget(x_input)
+            row.addWidget(y_input)
 
-        if self.rb_eq1.isChecked():
-            eq_num = 1
-        elif self.rb_eq2.isChecked():
-            eq_num = 2
-        elif self.rb_eq3.isChecked():
-            eq_num = 3
-        elif self.rb_eq4.isChecked():
-            eq_num = 4
-        elif self.rb_eq5.isChecked():
-            eq_num = 5
+            container = QFrame()
+            container.setLayout(row)
+            self.inputs_layout.addWidget(container)
+
+            self.x_inputs.append(x_input)
+            self.y_inputs.append(y_input)
+
+    def solve(self):
+        input_file = self.edit_file_input.text().strip()
+        output_file = self.edit_file_output.text().strip()
+
+        if input_file:  # Если имя входного файла задано — игнорируем ручной ввод
+            FieldParser.parse_data(
+                self.main_window,
+                input_file,
+                output_file,
+                [],  # пустые x/y, т.к. они будут загружены из файла
+                [],
+            )
         else:
-            eq_num = 6
+            x_array = []
+            y_array = []
+
+            for x_edit, y_edit in zip(self.x_inputs, self.y_inputs):
+                try:
+                    x_val = float(x_edit.text())
+                    y_val = float(y_edit.text())
+                    x_array.append(x_val)
+                    y_array.append(y_val)
+                except ValueError:
+                    print("Ошибка: некорректный ввод.")
+                    self.main_window.lbl_bottom.setText(messages.getMessageByCode(14))
+                    return
+
+            # === Новая проверка на разную длину ===
+            if len(x_array) != len(y_array):
+                self.main_window.lbl_bottom.setText("пары не образуются")
+                return
+
+            FieldParser.parse_data(
+                self.main_window,
+                "",
+                output_file,
+                x_array,
+                y_array,
+            )
 
 
-        FieldParser.parse_data(
-            main_window,
-            eq_num,
-            self.edit_file_input.text(),
-            self.edit_file_output.text(),
-            self.edit_left_bound.text(),
-            self.edit_right_bound.text(),
-            self.edit_h.text(),
-        )

@@ -1,9 +1,7 @@
 from methods.auxiliaryMethods.Kramer import findCoeffs
-from utils.Utils import predefined_functions
 
 
-def quadraticApproximation(eq_num, matrix, n):
-    f = predefined_functions[eq_num].function
+def quadraticApproximation( matrix, n):
     sx = round(sum(matrix[1]), 6)
     sxx=0
     sxxx = 0

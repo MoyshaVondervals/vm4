@@ -8,7 +8,6 @@ def determinant(matrix):
     for col in range(n):
         elem = matrix[0][col]
 
-        # формируем минор
         minor = []
         for r in range(1, n):
             row_minor = []
